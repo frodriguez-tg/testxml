@@ -1,6 +1,14 @@
 package main
 
-import "encoding/xml"
+import (
+	"encoding/csv"
+	"encoding/xml"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"strings"
+)
 
 type Incidents struct {
 	XMLName  xml.Name `xml:"incidents"`
@@ -185,5 +193,43 @@ type Incidents struct {
 }
 
 func main() {
+	xmlFile, err := os.Open("incidents.xml")
+	// if we os.Open returns an error then handle it
+	if err != nil {
+		fmt.Println(err)
+	}
 
+	fmt.Println("Successfully Opened incidents.xml")
+	// defer the closing of our xmlFile so that we can parse it later on
+	defer xmlFile.Close()
+
+	// read our opened xmlFile as a byte array.
+	byteValue, err := io.ReadAll(xmlFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var incidents Incidents
+	if err := xml.Unmarshal(byteValue, &incidents); err != nil {
+		log.Fatal(err)
+	}
+
+	file, err := os.Create("result.csv")
+	checkError("Cannot create file", err)
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	for _, result := range incidents.Incident {
+		err := writer.Write([]string{
+			strings.TrimSpace(result.Text), strings.TrimSpace(result.ID.Text), strings.TrimSpace(result.ID.Type),
+		})
+		checkError("Cannot write to file", err)
+	}
+}
+
+func checkError(message string, err error) {
+	if err != nil {
+		log.Fatal(message, err)
+	}
 }
